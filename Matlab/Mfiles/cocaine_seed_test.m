@@ -1,0 +1,96 @@
+function DA_modeling1
+
+
+N0=3000;%# molecules released pr release
+P=0.08;%release prob
+alfa=0.2;%DA can be release into 20% of availble volume, thus only in free extracellular space. 
+%ie it cannot be released into the cell.
+Na=6.022*10^23;%advogrados tal
+n=100;
+p1=0.0006;%density of terminals for single DA axon. 0.0006 in NA, 0.001 in Dorsal Striatum. 
+
+% 1um^3=10^15L
+gamma0=((N0*P)/(alfa*Na))*p1*1E24;% 
+
+Vmax = n*15;
+
+G=gamma0*n;%DA in nM if all DA neurons fire one AP simultaniously 
+gamma_soma = 20; %(i nano molær)
+Vmax_soma = 200; %(i nanomolær)
+A = 0.008; %somatodendritic inhibition constant units: Hz/nM
+
+Km=160;%MM.nM. 
+
+Tmax = 200;%s
+dt=0.01;%in s
+t=0:dt:Tmax;
+Nmax=length(t);
+cDAsoma = zeros(1,Nmax);
+cDAstriatum = zeros(1,Nmax);
+D2pre = zeros(1,Nmax);
+Pr = zeros(1,Nmax); 
+
+k_on = 1e-2;% Presyn AR: On rate in nanomolar! nM^-1 * s^-1
+k_off = 0.4;%Presyn AR off rate! s^-1
+Pmin = 0.03;
+Pmax = 0.15;
+Pr(1) = Pmax; 
+
+nu_in= 5*ones(1,Nmax);%Hz
+nu_eff = nu_in;
+
+Ki = 0.35;
+D = 3; %(mg pr kg, iv)
+tinfusion = 10;
+C_coc = cocaine_in_rat_brain(t, tinfusion, D);
+Kapp = Km*(1 + C_coc/Ki);
+
+%Data from FSCV 
+%temp = load('core_coc.txt');
+%Tcoc = temp(:,1);
+%NAcore_coc  =  1000*temp(:,2:end);
+
+% tph = [3 3.8 7 15];
+% dtph = [0.2 0.2 1.5 0.2];
+% nuph = [25 25 60 25];
+% 
+% 
+% 
+% 
+% for k = 1:length(tph)
+%     indx = tph(k) < t & t < tph(k) + dtph(k);
+%     nu_in(indx) = nuph(k);
+% end
+
+
+for k=2:Nmax
+ 
+    deltaC = (gamma_soma*nu_eff(k-1) - (Vmax_soma*cDAsoma(k-1)/(Kapp(k-1)+cDAsoma(k-1))))*dt;
+    
+    cDAsoma(k)=cDAsoma(k-1)+deltaC;
+    nu_eff(k) = max([nu_in(k) - A*cDAsoma(k), 0]);
+    
+end
+
+lam = nu_eff*dt; %poisson intensity for a singel DA neuron
+
+RAS = poissrnd(repmat(lam, n, 1)); %Make raster for all 'n' DA neurons
+
+F = sum(RAS)/dt; %This is the frequency of all release. 
+
+%figure(1)
+%plot(t,nu_in, t, nu_eff)
+%title('DA neuron firing freq over time')
+%xlabel('time, s')
+%ylabel('Frequency (Hz)')
+
+
+figure(2);
+smX=kernel_smooth(F, 10)
+plot(t,F, t, smX)
+
+title('summed firing freq of n neurons over time')
+xlabel('time, s')
+ylabel('summed firing freq of n neurons')
+
+%
